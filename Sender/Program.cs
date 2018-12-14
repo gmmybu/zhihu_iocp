@@ -13,6 +13,7 @@ namespace TestSlowReceiveClient
             {
                 using (Socket s = new Socket(SocketType.Stream, ProtocolType.Tcp))
                 {
+                    //改成接收端电脑的IP,也可以使用本机地址
                     s.Connect(new System.Net.IPEndPoint(IPAddress.Parse("172.16.4.98"), 3333));
 
                     while (true)
