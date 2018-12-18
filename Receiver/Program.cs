@@ -6,6 +6,13 @@ namespace TestSlowReceiveServer
 {
     class Program
     {
+        class SocketAndBuffer
+        {
+            public Socket s;
+            public byte[] buffer;
+        }
+
+
         static void Main(string[] args)
         {
             try
@@ -18,10 +25,7 @@ namespace TestSlowReceiveServer
                     while (true)
                     {
                         Socket c = s.Accept();
-
-                        byte[] buffer = new byte[8 * 1024];
-                        c.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None,
-                            AsyncReceiveCallback, c);
+                        BeginReceive(c);
                     }
                 }
             }
@@ -31,28 +35,51 @@ namespace TestSlowReceiveServer
             }
         }
 
+        static void BeginReceive(Socket s)
+        {
+            byte[] buffer = new byte[8 * 1024];
+
+            var state = new SocketAndBuffer();
+            state.s = s;
+            state.buffer = buffer;
+
+            s.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None,
+                AsyncReceiveCallback, state);
+        }
+
+        static UInt32 GetBufferIndex(byte[] bb, int length)
+        {
+            if (bb == null || length < 4)
+                return 0;
+
+            UInt32 a = bb[0];
+            UInt32 b = bb[1];
+            UInt32 c = bb[2];
+            UInt32 d = bb[3];
+            return (a << 24) | (b << 16) | (c << 8) | d;
+        }
+
         static void AsyncReceiveCallback(IAsyncResult result)
         {
-            Socket c = result.AsyncState as Socket;
+            SocketAndBuffer c = result.AsyncState as SocketAndBuffer;
             try
             {
-                if (c.EndReceive(result) != 0)
+                int length = c.s.EndReceive(result);
+                if (length != 0)
                 {
-                    Console.WriteLine(DateTime.Now + " receive buffer");
+                    Console.WriteLine(DateTime.Now + " receive buffer " + GetBufferIndex(c.buffer, length) + ", length " + length);
                     Thread.Sleep(20);
 
-                    byte[] buffer = new byte[8 * 1024];
-                    c.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None,
-                        AsyncReceiveCallback, c);
+                    BeginReceive(c.s);
                 }
                 else
                 {
-                    c.Close();
+                    c.s.Close();
                 }
             }
             catch (Exception ex)
             {
-                c.Close();
+                c.s.Close();
                 Console.WriteLine(ex.ToString());
             }
         }
